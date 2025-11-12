@@ -5,8 +5,8 @@ const app = express();
 
 app.use(express.json());
 
-// *** IMPORTANTE: Configuración para servir tu HTML ***
-// Si pusiste tu index.html en una carpeta 'public', esta línea es correcta.
+// Servimos los archivos estáticos (tu index.html)
+// Asegúrate de que tu 'index.html' esté en una carpeta 'public'
 app.use(express.static('public'));
 
 // Ruta de la API que llamará el frontend
@@ -16,8 +16,11 @@ app.post('/api/notify', async (req, res) => {
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.CHAT_ID;
 
+    // Log de diagnóstico (puedes borrarlo después)
+    console.log("Recibida petición en /api/notify");
+
     if (!botToken || !chatId) {
-        console.error("Error: BOT_TOKEN o CHAT_ID no están configurados.");
+        console.error("Error Crítico: BOT_TOKEN o CHAT_ID no están configurados en el entorno de Render.");
         return res.status(500).json({ error: 'Configuración del servidor incompleta' });
     }
 
@@ -41,7 +44,7 @@ app.post('/api/notify', async (req, res) => {
     const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
 
     try {
-        await fetch(url, {
+        const telegramResponse = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -50,13 +53,22 @@ app.post('/api/notify', async (req, res) => {
             }),
         });
         
-        res.status(200).json({ status: 'success' });
+        // *** MEJORA DE LOG: Leemos la respuesta de Telegram ***
+        const responseJson = await telegramResponse.json();
+
+        if (!responseJson.ok) {
+            // Si Telegram dice que algo salió mal (ej: chat not found)
+            console.error("Error de la API de Telegram:", responseJson.description);
+            res.status(500).json({ error: responseJson.description });
+        } else {
+            console.log("Notificación enviada a Telegram con éxito.");
+            res.status(200).json({ status: 'success' });
+        }
 
     } catch (error) {
-        console.error("Error al enviar a Telegram:", error);
-        
-        // *** ESTA ES LA LÍNEA CORREGIDA ***
-        res.status(500).json({ error: 'Falló el envío a Telegram' });
+        // Error de red (ej: no se pudo conectar con Telegram)
+        console.error("Error de red al intentar enviar a Telegram:", error);
+        res.status(500).json({ error: 'Falló la conexión con Telegram' });
     }
 });
 
