@@ -1,45 +1,46 @@
 // Importamos los módulos necesarios
 const express = require('express');
-const fetch = require('node-fetch'); // Necesitarás 'node-fetch' v2 para CommonJS
+const fetch = require('node-fetch'); // Necesitarás 'node-fetch' v2
 const app = express();
 
-// Middleware para que Express entienda JSON
 app.use(express.json());
 
-// Middleware para servir tu index.html desde la raíz
-// Asegúrate de que tu index.html esté en una carpeta 'public'
-// O si está en la raíz, ajústalo. Para Render, es mejor una carpeta 'public'.
-// Vamos a simplificar: si 'index.html' está en la raíz, Render lo servirá como estático.
-// Nos enfocaremos en la API.
+// *** IMPORTANTE: Configuración para servir tu HTML ***
+// Render necesita saber dónde está tu index.html.
+// Crea una carpeta 'public' y pon tu 'index.html' dentro.
+// Luego, usa esta línea para servirlo:
+app.use(express.static('public'));
 
-// Ruta de la API que llamará el frontend
+// Si prefieres dejar el index.html en la raíz, Render
+// a veces necesita que le indiques cómo servirlo.
+// Esta ruta de API es la importante.
+
 app.post('/api/notify', async (req, res) => {
     
     // 1. Obtenemos los secretos de las Variables de Entorno de Render
-    // ¡NUNCA escribas tus tokens aquí!
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.CHAT_ID;
 
     if (!botToken || !chatId) {
-        console.error("Error: BOT_TOKEN o CHAT_ID no están configurados en el entorno.");
+        console.error("Error: BOT_TOKEN o CHAT_ID no están configurados.");
         return res.status(500).json({ error: 'Configuración del servidor incompleta' });
     }
 
-    // 2. Obtenemos los datos que envió el frontend
-    const { query, country, city, regionName } = req.body;
+    // *** CAMBIO 4: Recibimos la estructura de datos de 'ipwho.is' ***
+    // (Ya no es 'query' ni 'regionName')
+    const { ip, country, city, region } = req.body;
 
     // 3. Limpiamos los datos
-    const ip = query || 'Desconocida';
+    const ip_visitante = ip || 'Desconocida';
     const pais = country || 'Desconocido';
     const ciudad = city || 'Desconocida';
-    const region = regionName || ''; // 'regionName' es el "Barrio o ciudad" de ip-api
+    const barrio_region = region || ''; // 'region' es el "Barrio o ciudad"
 
     // 4. Formateamos el mensaje exacto que pediste
-    // (Sin el número de visita, como acordamos)
     const message = `--- Nueva Visita ---\n` +
-                    `IP: ${ip}\n` +
+                    `IP: ${ip_visitante}\n` +
                     `País: ${pais}\n` +
-                    `Barrio O ciudad: ${ciudad} (${region})\n\n` +
+                    `Barrio O ciudad: ${ciudad} (${barrio_region})\n\n` +
                     `el barto`;
 
     // 5. Enviamos el mensaje a Telegram
@@ -55,12 +56,11 @@ app.post('/api/notify', async (req, res) => {
             }),
         });
         
-        // 6. Respondemos al frontend que todo salió bien
         res.status(200).json({ status: 'success' });
 
     } catch (error) {
         console.error("Error al enviar a Telegram:", error);
-        res.status(500).json({ error: 'Falló el envío a Telegram' });
+        res.status(5T0).json({ error: 'Falló el envío a Telegram' });
     }
 });
 
