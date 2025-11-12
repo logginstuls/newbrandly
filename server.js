@@ -6,15 +6,10 @@ const app = express();
 app.use(express.json());
 
 // *** IMPORTANTE: Configuración para servir tu HTML ***
-// Render necesita saber dónde está tu index.html.
-// Crea una carpeta 'public' y pon tu 'index.html' dentro.
-// Luego, usa esta línea para servirlo:
+// Si pusiste tu index.html en una carpeta 'public', esta línea es correcta.
 app.use(express.static('public'));
 
-// Si prefieres dejar el index.html en la raíz, Render
-// a veces necesita que le indiques cómo servirlo.
-// Esta ruta de API es la importante.
-
+// Ruta de la API que llamará el frontend
 app.post('/api/notify', async (req, res) => {
     
     // 1. Obtenemos los secretos de las Variables de Entorno de Render
@@ -26,15 +21,14 @@ app.post('/api/notify', async (req, res) => {
         return res.status(500).json({ error: 'Configuración del servidor incompleta' });
     }
 
-    // *** CAMBIO 4: Recibimos la estructura de datos de 'ipwho.is' ***
-    // (Ya no es 'query' ni 'regionName')
+    // 2. Recibimos la estructura de datos de 'ipwho.is'
     const { ip, country, city, region } = req.body;
 
     // 3. Limpiamos los datos
     const ip_visitante = ip || 'Desconocida';
     const pais = country || 'Desconocido';
     const ciudad = city || 'Desconocida';
-    const barrio_region = region || ''; // 'region' es el "Barrio o ciudad"
+    const barrio_region = region || '';
 
     // 4. Formateamos el mensaje exacto que pediste
     const message = `--- Nueva Visita ---\n` +
@@ -60,7 +54,9 @@ app.post('/api/notify', async (req, res) => {
 
     } catch (error) {
         console.error("Error al enviar a Telegram:", error);
-        res.status(5T0).json({ error: 'Falló el envío a Telegram' });
+        
+        // *** ESTA ES LA LÍNEA CORREGIDA ***
+        res.status(500).json({ error: 'Falló el envío a Telegram' });
     }
 });
 
