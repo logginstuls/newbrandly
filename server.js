@@ -16,7 +16,7 @@ app.post('/api/notify', async (req, res) => {
     const botToken = process.env.BOT_TOKEN;
     const chatId = process.env.CHAT_ID;
 
-    // Log de diagnóstico (puedes borrarlo después)
+    // Log de diagnóstico
     console.log("Recibida petición en /api/notify");
 
     if (!botToken || !chatId) {
@@ -31,14 +31,16 @@ app.post('/api/notify', async (req, res) => {
     const ip_visitante = ip || 'Desconocida';
     const pais = country || 'Desconocido';
     const ciudad = city || 'Desconocida';
-    const barrio_region = region || '';
+    // Nota: 'region' es el barrio/estado, lo quitamos del mensaje
+    // pero lo dejamos aquí por si lo quieres usar luego.
+    const barrio_region = region || ''; 
 
-    // 4. Formateamos el mensaje exacto que pediste
-    const message = `--- Nueva Visita ---\n` +
-                    `IP: ${ip_visitante}\n` +
-                    `País: ${pais}\n` +
-                    `Barrio O ciudad: ${ciudad} (${barrio_region})\n\n` +
-                    `el barto`;
+    // *** 4. ¡CAMBIO DE FORMATO! (Tu nueva petición) ***
+    // Usamos ` (backticks) para un mensaje de varias líneas.
+    const message = `NUEVO INGRESO
+IP: ${ip_visitante}
+PAIS: ${pais}
+CIUDAD: ${ciudad}`;
 
     // 5. Enviamos el mensaje a Telegram
     const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -53,11 +55,11 @@ app.post('/api/notify', async (req, res) => {
             }),
         });
         
-        // *** MEJORA DE LOG: Leemos la respuesta de Telegram ***
+        // Leemos la respuesta de Telegram
         const responseJson = await telegramResponse.json();
 
         if (!responseJson.ok) {
-            // Si Telegram dice que algo salió mal (ej: chat not found)
+            // Si Telegram dice que algo salió mal
             console.error("Error de la API de Telegram:", responseJson.description);
             res.status(500).json({ error: responseJson.description });
         } else {
@@ -66,8 +68,8 @@ app.post('/api/notify', async (req, res) => {
         }
 
     } catch (error) {
-        // Error de red (ej: no se pudo conectar con Telegram)
-        console.error("Error de red al intentar enviar a Telegram:", error);
+        // Error de red
+        console.error("Error de red al intentar enviar a Telegram:", error.message);
         res.status(500).json({ error: 'Falló la conexión con Telegram' });
     }
 });
