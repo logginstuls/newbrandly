@@ -1,81 +1,87 @@
-// Importamos los módulos necesarios
+// --- Dependencias ---
 const express = require('express');
-const fetch = require('node-fetch'); // Necesitarás 'node-fetch' v2
+const fetch = require('node-fetch'); // Versión 2.x para compatibilidad
 const app = express();
 
 app.use(express.json());
 
-// Servimos los archivos estáticos (tu index.html)
-// Asegúrate de que tu 'index.html' esté en una carpeta 'public'
+// Servir archivos estáticos (index.html dentro de /public)
 app.use(express.static('public'));
 
-// Ruta de la API que llamará el frontend
+// --- Ruta principal de notificación ---
 app.post('/api/notify', async (req, res) => {
-    
-    // 1. Obtenemos los secretos de las Variables de Entorno de Render
-    const botToken = process.env.BOT_TOKEN;
-    const chatId = process.env.CHAT_ID;
+  console.log("📩 Nueva petición recibida en /api/notify");
 
-    // Log de diagnóstico
-    console.log("Recibida petición en /api/notify");
+  const botToken = process.env.BOT_TOKEN;
+  const chatId = process.env.CHAT_ID;
 
-    if (!botToken || !chatId) {
-        console.error("Error Crítico: BOT_TOKEN o CHAT_ID no están configurados en el entorno de Render.");
-        return res.status(500).json({ error: 'Configuración del servidor incompleta' });
+  if (!botToken || !chatId) {
+    console.error("❌ BOT_TOKEN o CHAT_ID no configurados en Render");
+    return res.status(500).json({ error: 'Configuración del servidor incompleta' });
+  }
+
+  // Datos recibidos del frontend
+  const { ip, country, city, region } = req.body || {};
+  const ip_visitante = ip || 'Desconocida';
+  const pais = country || 'Desconocido';
+  const ciudad = city || 'Desconocida';
+  const zona = region || '';
+
+  // --- NUEVO: Obtener fecha y hora local ---
+  let fechaHoraLocal = '';
+  try {
+    const tzRes = await fetch(`https://worldtimeapi.org/api/ip/${ip_visitante}.json`);
+    if (tzRes.ok) {
+      const tzData = await tzRes.json();
+      fechaHoraLocal = tzData.datetime
+        ? new Date(tzData.datetime).toLocaleString('es-CO', { timeZone: tzData.timezone })
+        : new Date().toLocaleString('es-CO');
+    } else {
+      fechaHoraLocal = new Date().toLocaleString('es-CO');
+    }
+  } catch {
+    fechaHoraLocal = new Date().toLocaleString('es-CO');
+  }
+
+  // --- Mensaje completo ---
+  const message = `
+🔔 *NUEVO INGRESO DETECTADO*
+🕒 Fecha/Hora: ${fechaHoraLocal}
+🌐 IP: ${ip_visitante}
+🏳️ País: ${pais}
+🏙️ Ciudad: ${ciudad}${zona ? ` (${zona})` : ''}`.trim();
+
+  const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+
+  try {
+    const telegramResponse = await fetch(telegramUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'Markdown',
+      }),
+    });
+
+    const responseJson = await telegramResponse.json();
+
+    if (!responseJson.ok) {
+      console.error("⚠️ Error de Telegram:", responseJson.description);
+      return res.status(500).json({ error: responseJson.description });
     }
 
-    // 2. Recibimos la estructura de datos de 'ipwho.is'
-    const { ip, country, city, region } = req.body;
+    console.log("✅ Notificación enviada correctamente a Telegram.");
+    res.status(200).json({ status: 'success' });
 
-    // 3. Limpiamos los datos
-    const ip_visitante = ip || 'Desconocida';
-    const pais = country || 'Desconocido';
-    const ciudad = city || 'Desconocida';
-    // Nota: 'region' es el barrio/estado, lo quitamos del mensaje
-    // pero lo dejamos aquí por si lo quieres usar luego.
-    const barrio_region = region || ''; 
-
-    // *** 4. ¡CAMBIO DE FORMATO! (Tu nueva petición) ***
-    // Usamos ` (backticks) para un mensaje de varias líneas.
-    const message = `NUEVO INGRESO
-IP: ${ip_visitante}
-PAIS: ${pais}
-CIUDAD: ${ciudad}`;
-
-    // 5. Enviamos el mensaje a Telegram
-    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-
-    try {
-        const telegramResponse = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: chatId,
-                text: message,
-            }),
-        });
-        
-        // Leemos la respuesta de Telegram
-        const responseJson = await telegramResponse.json();
-
-        if (!responseJson.ok) {
-            // Si Telegram dice que algo salió mal
-            console.error("Error de la API de Telegram:", responseJson.description);
-            res.status(500).json({ error: responseJson.description });
-        } else {
-            console.log("Notificación enviada a Telegram con éxito.");
-            res.status(200).json({ status: 'success' });
-        }
-
-    } catch (error) {
-        // Error de red
-        console.error("Error de red al intentar enviar a Telegram:", error.message);
-        res.status(500).json({ error: 'Falló la conexión con Telegram' });
-    }
+  } catch (error) {
+    console.error("🚫 Error al enviar a Telegram:", error.message);
+    res.status(500).json({ error: 'Error al conectar con Telegram' });
+  }
 });
 
-// Iniciamos el servidor en el puerto que Render nos asigne
+// --- Iniciar servidor ---
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Servidor escuchando en el puerto ${PORT}`);
+  console.log(`🚀 Servidor escuchando en el puerto ${PORT}`);
 });
